@@ -16,7 +16,11 @@ firebase = pyrebase.initialize_app(firebase_config)
 auth = firebase.auth()
 
 cred = credentials.Certificate("C:\python\StreamLit\serviceAccountKey.json")
-
+  FIREBASE_SERVICE_ACCOUNT = {
+    "type": "...",
+    "project_id": "...",
+    ...
+  }
 if not firebase_admin._apps:
     firebase_admin.initialize_app(cred, {
         "projectId": firebase_config["projectId"]

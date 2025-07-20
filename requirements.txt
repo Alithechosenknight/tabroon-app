@@ -1,4 +1,6 @@
 pyrebase4
+google-cloud-storage
+google-cloud-firestore
+firebase-admin
 streamlit
-pyrebase4
-cryptography
+Pillow

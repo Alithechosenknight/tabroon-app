@@ -1,0 +1,4 @@
+pyrebase4
+streamlit
+pyrebase4
+cryptography

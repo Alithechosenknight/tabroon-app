@@ -25,7 +25,7 @@ try:
     cred = credentials.Certificate(service_account_info)
 except Exception:
     # Fallback for local dev: load from file if available
-    cred = credentials.Certificate(os.environ.get("FIREBASE_SERVICE_ACCOUNT_FILE", "serviceAccountKey.json"))
+    cred = credentials.Certificate(os.environ.get("FIREBASE_SERVICE_ACCOUNT_FILE", "secrets.toml"))
 
 if not firebase_admin._apps:
     firebase_admin.initialize_app(cred, {

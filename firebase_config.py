@@ -24,7 +24,10 @@ try:
     cred = credentials.Certificate(service_account_info)
 except Exception:
     # Fallback for local dev: load from file if available
-    key_path = os.environ.get("FIREBASE_SERVICE_ACCOUNT_FILE", "sports-2f624-firebase-adminsdk-fbsvc-629b2a3ecf.json")
+    key_path = os.environ.get(
+        "FIREBASE_SERVICE_ACCOUNT_FILE",
+        "sports-2f624-firebase-adminsdk-fbsvc-eb59154d17.json"
+    )
     print("Using service account key file:", key_path)
     print("File exists:", os.path.exists(key_path))
     cred = credentials.Certificate(key_path)

@@ -1,5 +1,5 @@
 import streamlit as st
-from firebase_config import db  
+from firebase_config import db
 import uuid
 import base64
 import datetime

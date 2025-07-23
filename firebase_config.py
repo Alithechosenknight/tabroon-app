@@ -1,13 +1,16 @@
-import streamlit as st
 import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_admin import credentials, firestore, auth as firebase_auth
+import streamlit as st
 import json
 
-# Initialize Firebase Admin SDK
+# Load Firebase credentials from Streamlit secrets
+cred_dict = st.secrets["FIREBASE_SERVICE_ACCOUNT"]
+cred = credentials.Certificate(cred_dict)
+
+# Initialize Firebase App
 if not firebase_admin._apps:
-    service_account_info = json.loads(st.secrets["FIREBASE_SERVICE_ACCOUNT"])
-    cred = credentials.Certificate(service_account_info)
     firebase_admin.initialize_app(cred)
 
-# Export Firestore client
+# Firestore DB and Auth
 db = firestore.client()
+auth = firebase_auth

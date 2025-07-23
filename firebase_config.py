@@ -1,13 +1,20 @@
 import firebase_admin
 from firebase_admin import credentials, firestore, auth as firebase_auth
-import streamlit as st
-import json
+import toml
+import os
 
-# Convert TOML object to regular dict
-cred_dict = dict(st.secrets["FIREBASE_SERVICE_ACCOUNT"])
-cred = credentials.Certificate(cred_dict)
+# Path to your secrets.toml file
+TOML_PATH = os.path.join(os.path.dirname(__file__), ".streamlit", "secrets.toml")
+
+# Load the TOML file
+secrets = toml.load(TOML_PATH)
+cred_dict = dict(secrets["FIREBASE_SERVICE_ACCOUNT"])
+
+# No need to touch the private_key!
+print("PRIVATE KEY REPR:", repr(cred_dict["private_key"]))  # For debugging, can be removed
 
 # Initialize Firebase App
+cred = credentials.Certificate(cred_dict)
 if not firebase_admin._apps:
     firebase_admin.initialize_app(cred)
 

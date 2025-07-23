@@ -11,7 +11,6 @@ secrets = toml.load(TOML_PATH)
 cred_dict = dict(secrets["FIREBASE_SERVICE_ACCOUNT"])
 
 # No need to touch the private_key!
-print("PRIVATE KEY REPR:", repr(cred_dict["private_key"]))  # For debugging, can be removed
 
 # Initialize Firebase App
 cred = credentials.Certificate(cred_dict)

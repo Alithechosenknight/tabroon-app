@@ -1,5 +1,3 @@
-
-
 import streamlit as st
 from firebase_config import auth, db  # custom module with firebase_admin or pyrebase init
 import uuid
@@ -14,53 +12,146 @@ st.set_page_config(page_title="🏆 Kuwait Football App", layout="wide")
 st.markdown(
     f"""
     <style>
+    :root {{
+      --main-yellow: #F9C80E;
+      --main-bg: linear-gradient(120deg, #0f2027, #203a43, #2c5364);
+      --header-bg: rgba(20,30,50,0.95);
+      --card-bg: rgba(255,255,255,0.10);
+      --shadow: 0 4px 24px #0002;
+    }}
+
     html, body, [class*='css'] {{
-        background: linear-gradient(120deg, #0f2027, #203a43, #2c5364);
-        color: white;
-        min-height: 100vh;
+      background: var(--main-bg);
+      color: #fff;
+      min-height: 100vh;
+      font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+      scroll-behavior: smooth;
     }}
+
     .stApp {{
-        background: url('https://www.transparenttextures.com/patterns/football-no-lines.png'), linear-gradient(120deg, #0f2027, #203a43, #2c5364);
-        background-blend-mode: overlay;
+      background: url('https://www.transparenttextures.com/patterns/football-no-lines.png'), var(--main-bg);
+      background-blend-mode: overlay;
     }}
+
     .main-header-bar {{
-        position: sticky;
-        top: 0;
-        z-index: 100;
-        background: rgba(20,30,50,0.95);
-        box-shadow: 0 2px 16px 0 #0006;
-        border-bottom: 2px solid #F9C80E;
-        padding: 0.5rem 2rem 0.5rem 2rem;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--header-bg);
+      box-shadow: 0 2px 16px 0 #0006;
+      border-bottom: 2px solid var(--main-yellow);
+      padding: 0.5rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: background 0.3s;
     }}
-    .main-header-bar img {{ border-radius: 50%; box-shadow: 0 2px 8px #0004; }}
-    .main-header-title {{ font-size: 2.2rem; font-weight: 800; letter-spacing: 1px; color: #F9C80E; margin: 0; }}
-    .lang-toggle {{ font-size: 1.1rem; font-weight: 600; color: #fff; background: #F9C80E; border-radius: 8px; padding: 0.2rem 1rem; border: none; margin-left: 1rem; }}
-    .stSidebar {{ background: rgba(20,30,50,0.98); border-right: 2px solid #F9C80E; }}
-    .sidebar-avatar {{ width: 70px; height: 70px; border-radius: 50%; border: 3px solid #F9C80E; margin-bottom: 1rem; object-fit: cover; }}
-    .sidebar-active {{ background: #F9C80E22; border-radius: 8px; }}
+
+    .main-header-bar img {{
+      border-radius: 50%;
+      box-shadow: 0 2px 8px #0004;
+      width: 60px;
+      height: 60px;
+      object-fit: cover;
+    }}
+
+    .main-header-title {{
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: 1px;
+      color: var(--main-yellow);
+      margin: 0;
+      transition: font-size 0.2s;
+    }}
+
+    .lang-toggle {{
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #fff;
+      background: var(--main-yellow);
+      border-radius: 8px;
+      padding: 0.2rem 1rem;
+      border: none;
+      margin-left: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }}
+
+    .lang-toggle:hover, .lang-toggle:focus {{
+      background: #ffe066;
+      color: #222;
+    }}
+
+    .stSidebar {{
+      background: rgba(20,30,50,0.98);
+      border-right: 2px solid var(--main-yellow);
+    }}
+
+    .sidebar-avatar {{
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      border: 3px solid var(--main-yellow);
+      margin-bottom: 1rem;
+      object-fit: cover;
+    }}
+
+    .sidebar-active {{
+      background: #F9C80E22;
+      border-radius: 8px;
+    }}
+
     .stButton>button {{
-        background:#F9C80E!important;color:#000;font-weight:600;border-radius:8px;border:none;
-        box-shadow: 0 2px 8px #0002; transition: 0.2s;
+      background: var(--main-yellow)!important;
+      color: #000;
+      font-weight: 600;
+      border-radius: 8px;
+      border: none;
+      box-shadow: 0 2px 8px #0002;
+      transition: background 0.2s, transform 0.2s;
     }}
-    .stButton>button:hover {{ background: #ffe066!important; transform: scale(1.04); }}
-    .stTabs [role='tab'] span {{ color:#F9C80E !important; font-weight:700; }}
-    .stTabs [role='tab'][aria-selected='true'] span {{ text-shadow: 0 2px 8px #F9C80E44; }}
+
+    .stButton>button:hover, .stButton>button:focus {{
+      background: #ffe066!important;
+      transform: scale(1.04);
+    }}
+
     .card {{
-        background: rgba(255,255,255,0.10); padding:1.2rem 1.5rem; border-left:6px solid #F9C80E; border-radius:16px;
-        margin-bottom: 1.5rem; box-shadow: 0 4px 24px #0002; position: relative;
-        transition: box-shadow 0.2s, transform 0.2s;
+      background: var(--card-bg);
+      padding: 1.2rem 1.5rem;
+      border-left: 6px solid var(--main-yellow);
+      border-radius: 16px;
+      margin-bottom: 1.5rem;
+      box-shadow: var(--shadow);
+      position: relative;
+      transition: box-shadow 0.2s, transform 0.2s;
+      will-change: box-shadow, transform;
     }}
-    .card:hover {{ box-shadow: 0 8px 32px #F9C80E44; transform: translateY(-2px) scale(1.01); }}
+
+    .card:hover {{
+      box-shadow: 0 8px 32px #F9C80E44;
+      transform: translateY(-2px) scale(1.01);
+    }}
+
+    @media (max-width: 900px) {{
+      .main-header-title {{ font-size: 1.5rem; }}
+      .main-header-bar {{ flex-direction: column; align-items: flex-start; }}
+      .card {{ padding: 1rem; }}
+    }}
+
+    @media (max-width: 600px) {{
+      .main-header-title {{ font-size: 1.1rem; }}
+      .main-header-bar {{ padding: 0.5rem 1rem; }}
+      .card {{ padding: 0.7rem; }}
+      .sidebar-avatar {{ width: 50px; height: 50px; }}
+    }}
     .player-badge {{
-        display: inline-block; background: #F9C80E; color: #222; font-size: 0.9rem; font-weight: 700;
+        display: inline-block; background: var(--main-yellow); color: #222; font-size: 0.9rem; font-weight: 700;
         border-radius: 6px; padding: 0.1rem 0.7rem; margin-left: 0.5rem;
     }}
-    .player-icons {{ font-size: 1.1rem; margin-right: 0.3rem; color: #F9C80E; }}
+    .player-icons {{ font-size: 1.1rem; margin-right: 0.3rem; color: var(--main-yellow); }}
     .divider {{ border-top: 2px dashed #F9C80E33; margin: 2rem 0; }}
-    .section-title {{ font-size: 1.5rem; font-weight: 700; color: #F9C80E; margin-bottom: 1rem; }}
+    .section-title {{ font-size: 1.5rem; font-weight: 700; color: var(--main-yellow); margin-bottom: 1rem; }}
     .watermark-bg {{
         position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; z-index: 0;
         background: url('https://cdn.pixabay.com/photo/2013/07/13/12/46/soccer-146674_1280.png') center/40vw no-repeat;

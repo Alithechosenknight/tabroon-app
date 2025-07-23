@@ -1,5 +1,5 @@
 import streamlit as st
-from firebase_config import auth, db  # custom module with firebase_admin or pyrebase init
+from firebase_config import db  
 import uuid
 import base64
 import datetime

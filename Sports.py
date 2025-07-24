@@ -1,3 +1,4 @@
+from firebase_admin import auth
 import streamlit as st
 from firebase_config import db
 import uuid
@@ -179,6 +180,7 @@ SS["lang"] = "ar" if lang == "العربية" else "en"
 T = {
     "en": {
         "login": "Login or Register",
+        "register": "Register",
         "home": "Home",
         "dashboard": "Dashboard",
         "messages": "Messages",
@@ -259,6 +261,7 @@ T = {
     },
     "ar": {
         "login": "دخول أو تسجيل",
+        "register": "تسجيل جديد",
         "home": "الرئيسية",
         "dashboard": "لوحة التحكم",
         "messages": "الرسائل",
@@ -438,12 +441,12 @@ def logout():
 
 def page_login():
     st.header(tr("login"))
-    option = st.radio(tr("login"), [tr("login"), tr("create_team")])
+    option = st.radio(tr("login"), [tr("login"), tr("register")])
     email = st.text_input("Email")
     password = st.text_input("Password", type="password")
-    if option == tr("create_team"):
+    if option == tr("register"):
         username = st.text_input(tr("player_name"))
-        if st.button(tr("login_register")):
+        if st.button(tr("register")):
             try:
                 user = auth.create_user_with_email_and_password(email, password)
                 uid = user["localId"]

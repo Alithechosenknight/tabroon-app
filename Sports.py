@@ -1,9 +1,9 @@
-from firebase_admin import auth
 import streamlit as st
-from firebase_config import db
+from firebase_config import db, auth
 import uuid
 import base64
 import datetime
+import hashlib
 
 # ────────────────────────────────────────────────────────────────────────────────
 # PAGE CONFIG & THEME
@@ -15,9 +15,9 @@ st.markdown(
     <style>
     :root {{
       --main-yellow: #F9C80E;
-      --main-bg: linear-gradient(120deg, #0f2027, #203a43, #2c5364);
-      --header-bg: rgba(20,30,50,0.95);
-      --card-bg: rgba(255,255,255,0.10);
+      --main-bg: linear-gradient(120deg, #2c3e50, #34495e, #3498db);
+      --header-bg: rgba(44, 62, 80, 0.95);
+      --card-bg: rgba(255,255,255,0.15);
       --shadow: 0 4px 24px #0002;
     }}
 
@@ -84,7 +84,7 @@ st.markdown(
     }}
 
     .stSidebar {{
-      background: rgba(20,30,50,0.98);
+      background: rgba(44, 62, 80, 0.98);
       border-right: 2px solid var(--main-yellow);
     }}
 
@@ -159,6 +159,55 @@ st.markdown(
         opacity: 0.04;
         pointer-events: none;
     }}
+    
+    .post-card {{
+        background: var(--card-bg);
+        border-radius: 16px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        border-left: 6px solid var(--main-yellow);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }}
+    
+    .post-card:hover {{
+        transform: translateY(-2px);
+        box-shadow: 0 8px 32px #F9C80E44;
+    }}
+    
+    .profile-header {{
+        background: linear-gradient(135deg, var(--main-yellow)22, transparent);
+        border-radius: 16px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        border: 2px solid var(--main-yellow)33;
+    }}
+    
+    .stats-grid {{
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 1rem;
+        margin: 1rem 0;
+    }}
+    
+    .stat-item {{
+        background: var(--card-bg);
+        padding: 1rem;
+        border-radius: 12px;
+        text-align: center;
+        border: 2px solid var(--main-yellow)33;
+    }}
+    
+    .stat-value {{
+        font-size: 2rem;
+        font-weight: bold;
+        color: var(--main-yellow);
+    }}
+    
+    .stat-label {{
+        font-size: 0.9rem;
+        color: #ccc;
+        margin-top: 0.5rem;
+    }}
     </style>
     <div class='watermark-bg'></div>
     """,
@@ -173,6 +222,9 @@ SS.setdefault("user", None)          # firebase user dict
 SS.setdefault("page", "main")        # routing
 SS.setdefault("active_chat", None)    # conversation id
 SS.setdefault("lang", "en")
+SS.setdefault("viewing_profile", None)  # profile being viewed
+SS.setdefault("feed_filter", "all")     # feed filter
+SS.setdefault("user_data_cache", {})    # cache user data to prevent repeated DB calls
 lang = st.sidebar.selectbox("🌐 اللغة / Language", ["English", "العربية"], key="lang_toggle")
 SS["lang"] = "ar" if lang == "العربية" else "en"
 
@@ -244,7 +296,7 @@ T = {
         "challenge_history": "Challenge History",
         "from_on_status": "From {name} on {date}: Status — {status}",
         "challenged_you": "{name} challenged you: {msg}",
-        "main_title": "🏆 Kuwait Football App",
+        "main_title": "🏆 Tbaroon.com",
         "navigation": "Navigation",
         "login_register": "Login / Register",
         "logout_btn": "Logout",
@@ -258,6 +310,53 @@ T = {
         "add_player_tab": "Add Player",
         "welcome": "Welcome, {username}",
         "delete": "Delete",
+        "feed": "Feed",
+        "create_post": "Create Post",
+        "post_content": "What's on your mind?",
+        "share_post": "Share Post",
+        "post_shared": "Post shared successfully!",
+        "like": "Like",
+        "comment": "Comment",
+        "comments": "Comments",
+        "add_comment": "Add a comment...",
+        "post_comment": "Post Comment",
+        "view_profile": "View Profile",
+        "edit_profile": "Edit Profile",
+        "profile_picture": "Profile Picture",
+        "bio": "Bio",
+        "speed": "Speed",
+        "control": "Control", 
+        "dribbling": "Dribbling",
+        "weak_foot": "Weak Foot",
+        "strong_foot": "Strong Foot",
+        "shooting": "Shooting",
+        "passing": "Passing",
+        "defending": "Defending",
+        "physical": "Physical",
+        "overall_rating": "Overall Rating",
+        "stats": "Stats",
+        "about": "About",
+        "posts": "Posts",
+        "followers": "Followers",
+        "following": "Following",
+        "follow": "Follow",
+        "unfollow": "Unfollow",
+        "search_players": "Search Players",
+        "search": "Search",
+        "no_posts": "No posts yet.",
+        "no_comments": "No comments yet.",
+        "post_deleted": "Post deleted!",
+        "comment_deleted": "Comment deleted!",
+        "profile_updated": "Profile updated successfully!",
+        "upload_profile_pic": "Upload Profile Picture",
+        "save_profile": "Save Profile",
+        "cancel": "Cancel",
+        "edit": "Edit",
+        "delete_post": "Delete Post",
+        "delete_comment": "Delete Comment",
+        "confirm_delete": "Are you sure?",
+        "yes": "Yes",
+        "no": "No",
     },
     "ar": {
         "login": "دخول أو تسجيل",
@@ -325,7 +424,7 @@ T = {
         "challenge_history": "سجل التحديات",
         "from_on_status": "من {name} بتاريخ {date}: الحالة — {status}",
         "challenged_you": "{name} تحداك: {msg}",
-        "main_title": "🏆 تطبيق كورة الكويت",
+        "main_title": "🏆 Tbaroon.com",
         "navigation": "التنقل",
         "login_register": "دخول / تسجيل",
         "logout_btn": "تسجيل خروج",
@@ -339,6 +438,53 @@ T = {
         "add_player_tab": "ضيف لاعب",
         "welcome": "هلا {username}",
         "delete": "حذف",
+        "feed": "المنشورات",
+        "create_post": "منشور جديد",
+        "post_content": "شو في بالك؟",
+        "share_post": "شارك المنشور",
+        "post_shared": "تم مشاركة المنشور!",
+        "like": "إعجاب",
+        "comment": "تعليق",
+        "comments": "التعليقات",
+        "add_comment": "أضف تعليق...",
+        "post_comment": "أضف التعليق",
+        "view_profile": "عرض الملف الشخصي",
+        "edit_profile": "تعديل الملف الشخصي",
+        "profile_picture": "صورة الملف الشخصي",
+        "bio": "نبذة",
+        "speed": "السرعة",
+        "control": "التحكم",
+        "dribbling": "المراوغة",
+        "weak_foot": "الرجل الضعيفة",
+        "strong_foot": "الرجل القوية",
+        "shooting": "التسديد",
+        "passing": "التمرير",
+        "defending": "الدفاع",
+        "physical": "البدنية",
+        "overall_rating": "التقييم العام",
+        "stats": "الإحصائيات",
+        "about": "حول",
+        "posts": "المنشورات",
+        "followers": "المتابعون",
+        "following": "المتابَعون",
+        "follow": "متابعة",
+        "unfollow": "إلغاء المتابعة",
+        "search_players": "البحث عن لاعبين",
+        "search": "بحث",
+        "no_posts": "لا توجد منشورات بعد.",
+        "no_comments": "لا توجد تعليقات بعد.",
+        "post_deleted": "تم حذف المنشور!",
+        "comment_deleted": "تم حذف التعليق!",
+        "profile_updated": "تم تحديث الملف الشخصي!",
+        "upload_profile_pic": "رفع صورة الملف الشخصي",
+        "save_profile": "حفظ الملف الشخصي",
+        "cancel": "إلغاء",
+        "edit": "تعديل",
+        "delete_post": "حذف المنشور",
+        "delete_comment": "حذف التعليق",
+        "confirm_delete": "هل أنت متأكد؟",
+        "yes": "نعم",
+        "no": "لا",
     },
 }
 
@@ -383,6 +529,20 @@ def reroute(page: str):
     SS["page"] = page
     st.rerun()
 
+def get_user_data(uid: str):
+    """Get user data with caching to prevent repeated DB calls"""
+    if uid not in SS.get("user_data_cache", {}):
+        user_doc = db.collection("users").document(uid).get()
+        user_data = user_doc.to_dict() or {}
+        SS["user_data_cache"][uid] = user_data
+    return SS["user_data_cache"][uid]
+
+def update_user_data_cache(uid: str):
+    """Update the user data cache"""
+    user_doc = db.collection("users").document(uid).get()
+    user_data = user_doc.to_dict() or {}
+    SS["user_data_cache"][uid] = user_data
+
 # ────────────────────────────────────────────────────────────────────────────────
 # UI HELPERS
 # ────────────────────────────────────────────────────────────────────────────────
@@ -392,7 +552,7 @@ def header():
         f"""
         <div class='main-header-bar'>
             <div style='display:flex;align-items:center;'>
-                <img src='https://upload.wikimedia.org/wikipedia/en/thumb/e/e0/Kuwait_FA_logo.svg/1200px-Kuwait_FA_logo.svg.png' width='60' style='margin-right:18px;'>
+                <img src='https://upload.wikimedia.org/wikipedia/commons/1/1d/Football_Pallo_valmiina-cropped.jpg' width='60' style='margin-right:18px;'>
                 <span class='main-header-title'>{tr('main_title')}</span>
             </div>
             <div style='display:flex;align-items:center;'>
@@ -411,17 +571,23 @@ def header():
 def sidebar():
     with st.sidebar:
         st.markdown(f"<div style='text-align:center;margin-bottom:1.5rem;'>"
-                    f"<img src='https://www.bornfree.org.uk/wp-content/uploads/2023/09/Web-image-iStock-492611032-1024x683.jpg' class='sidebar-avatar'>"
+                    f"<img src='https://upload.wikimedia.org/wikipedia/commons/1/1d/Football_Pallo_valmiina-cropped.jpg' class='sidebar-avatar'>"
                     f"</div>", unsafe_allow_html=True)
         st.markdown(f"## {tr('navigation')}")
-        def nav_btn(label, icon, page):
+        def nav_btn(label, icon, page, on_click_args=None):
             active = SS["page"] == page
             style = 'sidebar-active' if active else ''
             st.markdown(f"<div class='{style}'>", unsafe_allow_html=True)
-            st.button(f"{icon} {label}", on_click=reroute, args=(page,))
+            if page == 'profile' and SS.get('user'):
+                # Always set viewing_profile to current user when clicking profile
+                st.button(f"{icon} {label}", on_click=lambda: set_profile_page_to_self(), key='sidebar_profile_btn')
+            else:
+                st.button(f"{icon} {label}", on_click=reroute, args=(page,))
             st.markdown("</div>", unsafe_allow_html=True)
         if SS["user"]:
+            nav_btn(tr('feed'), '📰', 'feed')
             nav_btn(tr('home_btn'), '🏠', 'main')
+            nav_btn(tr('profile'), '👤', 'profile')
             nav_btn(tr('dashboard_btn'), '📋', 'dashboard')
             nav_btn(tr('messages_btn'), '💬', 'messages')
             nav_btn(tr('challenges_btn'), '⚔️', 'challenges')
@@ -431,48 +597,535 @@ def sidebar():
         else:
             st.button(f"🔐 {tr('login_register')}", on_click=reroute, args=("login",))
 
+def set_profile_page_to_self():
+    SS["viewing_profile"] = SS["user"]["localId"]
+    reroute("profile")
+
 def logout():
     SS["user"] = None
+    SS["user_data_cache"] = {}  # Clear cache on logout
     reroute("main")
+
+def check_session():
+    """Check if user session is still valid"""
+    if SS.get("user") and SS["user"].get("localId"):
+        # Verify user still exists in database
+        try:
+            user_doc = db.collection("users").document(SS["user"]["localId"]).get()
+            if user_doc.exists:
+                return True
+        except:
+            pass
+    return False
 
 # ────────────────────────────────────────────────────────────────────────────────
 # AUTHENTICATION PAGES
 # ────────────────────────────────────────────────────────────────────────────────
 
 def page_login():
+    if SS.get("restored_profile"):
+        st.success("Profile restored! Please log in with your password.")
+        SS["restored_profile"] = False
     st.header(tr("login"))
     option = st.radio(tr("login"), [tr("login"), tr("register")])
     email = st.text_input("Email")
     password = st.text_input("Password", type="password")
+    
     if option == tr("register"):
         username = st.text_input(tr("player_name"))
         if st.button(tr("register")):
             try:
-                user = auth.create_user_with_email_and_password(email, password)
-                uid = user["localId"]
+                # Create user with Firebase Admin SDK
+                user_record = auth.create_user(
+                    email=email,
+                    password=password,
+                    display_name=username
+                )
+                uid = user_record.uid
+                
+                # Hash password for storage
+                hashed_password = hashlib.sha256(password.encode()).hexdigest()
+                
+                # Create user document in Firestore
                 db.collection("users").document(uid).set({
                     "username": username,
                     "email": email,
+                    "password_hash": hashed_password,
                     "profile": {},
+                    "stats": {
+                        "speed": 50, "control": 50, "dribbling": 50,
+                        "shooting": 50, "passing": 50, "defending": 50,
+                        "physical": 50, "weak_foot": 50, "strong_foot": "right",
+                        "overall": 50
+                    },
+                    "following": [],
+                    "followers": [],
+                    "bio": "",
+                    "profile_picture": None
                 })
                 st.success(tr("account_created"))
             except Exception as e:
-                st.error(e)
+                if "EMAIL_EXISTS" in str(e):
+                    st.error("Account already exists. Please log in instead.")
+                else:
+                    st.error(f"Registration error: {str(e)}")
     else:  # Login
         if st.button(tr("login")):
             try:
-                user = auth.sign_in_with_email_and_password(email, password)
-                SS["user"] = user
-                reroute("dashboard")
-            except Exception:
-                st.error(tr("invalid_credentials"))
+                # Simple login: check if user exists in Firestore
+                users_ref = db.collection("users")
+                query = users_ref.where("email", "==", email).limit(1).stream()
+                user_docs = list(query)
+                
+                if user_docs:
+                    user_doc = user_docs[0]
+                    user_data = user_doc.to_dict()
+                    
+                    # Verify password
+                    stored_hash = user_data.get("password_hash", "")
+                    input_hash = hashlib.sha256(password.encode()).hexdigest()
+                    
+                    if stored_hash == input_hash:
+                        SS["user"] = {
+                            "localId": user_doc.id,
+                            "email": user_data.get("email"),
+                            "displayName": user_data.get("username")
+                        }
+                        reroute("dashboard")
+                    else:
+                        st.error(tr("invalid_credentials"))
+                else:
+                    # Check if user exists in Auth but not Firestore
+                    try:
+                        user_record = auth.get_user_by_email(email)
+                        # If found, offer to restore Firestore profile
+                        st.warning("Account exists in authentication but not in app database. Click below to restore your profile.")
+                        if st.button("Restore Profile"):
+                            uid = user_record.uid
+                            hashed_password = hashlib.sha256(password.encode()).hexdigest()
+                            db.collection("users").document(uid).set({
+                                "username": user_record.display_name or email.split('@')[0],
+                                "email": email,
+                                "password_hash": hashed_password,
+                                "profile": {},
+                                "stats": {
+                                    "speed": 50, "control": 50, "dribbling": 50,
+                                    "shooting": 50, "passing": 50, "defending": 50,
+                                    "physical": 50, "weak_foot": 50, "strong_foot": "right",
+                                    "overall": 50
+                                },
+                                "following": [],
+                                "followers": [],
+                                "bio": "",
+                                "profile_picture": None
+                            })
+                            SS["restored_profile"] = True
+                            st.experimental_rerun()
+                    except Exception:
+                        st.error("User not found. Please register first.")
+            except Exception as e:
+                st.error(f"Login error: {str(e)}")
 
+
+# ────────────────────────────────────────────────────────────────────────────────
+# FEED PAGE (LinkedIn-like posts)
+# ────────────────────────────────────────────────────────────────────────────────
+
+def page_feed():
+    if not SS["user"]:
+        st.warning(tr("please_login"))
+        if st.button(tr("go_to_login")):
+            reroute("login")
+        return
+    
+    uid = SS["user"]["localId"]
+    st.header(f"📰 {tr('feed')}")
+    
+    # Create post section
+    with st.expander(f"✏️ {tr('create_post')}", expanded=False):
+        post_content = st.text_area(tr("post_content"), height=100)
+        post_image = st.file_uploader(tr("upload_image"), ["jpg", "jpeg", "png"], key="post_image")
+        img64 = base64.b64encode(post_image.read()).decode() if post_image else None
+        
+        if st.button(tr("share_post")):
+            if post_content.strip():
+                post_id = str(uuid.uuid4())
+                db.collection("posts").document(post_id).set({
+                    "author_id": uid,
+                    "content": post_content,
+                    "image_base64": img64,
+                    "likes": [],
+                    "comments": [],
+                    "timestamp": datetime.datetime.utcnow().isoformat(),
+                })
+                st.success(tr("post_shared"))
+                st.rerun()
+            else:
+                st.error("Please write something to post!")
+    
+    # Feed filter
+    filter_option = st.selectbox("Filter", ["All Posts", "My Posts", "Following"], key="feed_filter")
+    
+    # Get posts
+    posts_ref = db.collection("posts")
+    if filter_option == "My Posts":
+        posts = posts_ref.where("author_id", "==", uid).order_by("timestamp", direction="DESCENDING").stream()
+    elif filter_option == "Following":
+        # Get following list
+        user_doc = db.collection("users").document(uid).get()
+        user_data = user_doc.to_dict() or {}
+        following = user_data.get("following", [])
+        if following:
+            posts = posts_ref.where("author_id", "in", following).order_by("timestamp", direction="DESCENDING").stream()
+        else:
+            posts = []
+            st.info("You're not following anyone yet!")
+    else:
+        posts = posts_ref.order_by("timestamp", direction="DESCENDING").stream()
+    
+    # Display posts
+    for post in posts:
+        post_data = post.to_dict() or {}
+        author_id = post_data.get("author_id")
+        
+        # Get author info
+        author_doc = db.collection("users").document(author_id).get()
+        author_data = author_doc.to_dict() or {}
+        author_name = author_data.get("username", "Unknown Player")
+        author_pic = author_data.get("profile_picture")
+        
+        # Post card
+        with st.container():
+            st.markdown(f"""
+            <div class='card'>
+                <div style='display:flex;align-items:center;margin-bottom:1rem;'>
+                    <img src='{"data:image/png;base64," + author_pic if author_pic else "https://via.placeholder.com/50x50/666/fff?text=⚽"}' 
+                         style='width:50px;height:50px;border-radius:50%;margin-right:1rem;object-fit:cover;'>
+                    <div>
+                        <strong style='color:var(--main-yellow);'>{author_name}</strong><br>
+                        <small style='color:#ccc;'>{post_data.get('timestamp', '')[:19]}</small>
+                    </div>
+                </div>
+                <div style='margin-bottom:1rem;'>{post_data.get('content', '')}</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Post image
+            if post_data.get("image_base64"):
+                st.image(base64.b64decode(post_data["image_base64"]), width=400)
+            
+            # Like and comment buttons
+            col1, col2, col3 = st.columns([1, 1, 3])
+            with col1:
+                liked = uid in post_data.get("likes", [])
+                like_text = "❤️" if liked else "🤍"
+                if st.button(f"{like_text} {len(post_data.get('likes', []))}", key=f"like_{post.id}"):
+                    likes = post_data.get("likes", [])
+                    if uid in likes:
+                        likes.remove(uid)
+                    else:
+                        likes.append(uid)
+                    db.collection("posts").document(post.id).update({"likes": likes})
+                    st.rerun()
+            
+            with col2:
+                if st.button(f"💬 {len(post_data.get('comments', []))}", key=f"comment_btn_{post.id}"):
+                    SS[f"show_comments_{post.id}"] = not SS.get(f"show_comments_{post.id}", False)
+                    st.rerun()
+            
+            with col3:
+                if author_id == uid:
+                    if st.button("🗑️", key=f"delete_post_{post.id}"):
+                        if st.checkbox(tr("confirm_delete"), key=f"confirm_delete_{post.id}"):
+                            db.collection("posts").document(post.id).delete()
+                            st.success(tr("post_deleted"))
+                            st.rerun()
+            
+            # Comments section
+            if SS.get(f"show_comments_{post.id}", False):
+                st.markdown("---")
+                st.subheader(tr("comments"))
+                
+                # Add comment
+                new_comment = st.text_input(tr("add_comment"), key=f"comment_input_{post.id}")
+                if st.button(tr("post_comment"), key=f"post_comment_{post.id}"):
+                    if new_comment.strip():
+                        comment_id = str(uuid.uuid4())
+                        comments = post_data.get("comments", [])
+                        comments.append({
+                            "id": comment_id,
+                            "author_id": uid,
+                            "content": new_comment,
+                            "timestamp": datetime.datetime.utcnow().isoformat()
+                        })
+                        db.collection("posts").document(post.id).update({"comments": comments})
+                        st.rerun()
+                
+                # Display comments
+                for comment in post_data.get("comments", []):
+                    comment_author_doc = db.collection("users").document(comment["author_id"]).get()
+                    comment_author_data = comment_author_doc.to_dict() or {}
+                    comment_author_name = comment_author_data.get("username", "Unknown")
+                    
+                    st.markdown(f"""
+                    <div style='margin:0.5rem 0;padding:0.5rem;background:rgba(255,255,255,0.05);border-radius:8px;'>
+                        <strong style='color:var(--main-yellow);'>{comment_author_name}</strong>: {comment['content']}
+                        <br><small style='color:#ccc;'>{comment['timestamp'][:19]}</small>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Delete comment button (for comment author)
+                    if comment["author_id"] == uid:
+                        if st.button("🗑️", key=f"delete_comment_{comment['id']}"):
+                            comments = post_data.get("comments", [])
+                            comments = [c for c in comments if c["id"] != comment["id"]]
+                            db.collection("posts").document(post.id).update({"comments": comments})
+                            st.success(tr("comment_deleted"))
+                            st.rerun()
+            
+            st.markdown("<div style='margin:2rem 0;'></div>", unsafe_allow_html=True)
+
+# ────────────────────────────────────────────────────────────────────────────────
+# PROFILE PAGE
+# ────────────────────────────────────────────────────────────────────────────────
+
+def page_profile():
+    if not SS["user"]:
+        st.warning(tr("please_login"))
+        if st.button(tr("go_to_login")):
+            reroute("login")
+        return
+    uid = SS["user"]["localId"]
+    # Only set viewing_profile to self if not set
+    if SS.get("viewing_profile") is None:
+        SS["viewing_profile"] = uid
+    viewing_uid = SS.get("viewing_profile", uid)  # View own profile by default
+    
+    # Get user data
+    user_data = get_user_data(viewing_uid)
+    
+    # Profile header
+    profile_pic = user_data.get("profile_picture")
+    username = user_data.get("username", "Unknown Player")
+    bio = user_data.get("bio", "")
+    
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        if profile_pic:
+            st.image(base64.b64decode(profile_pic), width=200)
+        else:
+            st.markdown("""
+            <div style='width:200px;height:200px;border:3px dashed var(--main-yellow);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:4rem;'>
+                ⚽
+            </div>
+            """, unsafe_allow_html=True)
+    
+    with col2:
+        st.title(username)
+        if bio:
+            st.write(bio)
+        
+        # Follow/Unfollow button (if viewing someone else's profile)
+        if viewing_uid != uid:
+            current_user_doc = db.collection("users").document(uid).get()
+            current_user_data = current_user_doc.to_dict() or {}
+            following = current_user_data.get("following", [])
+            
+            if viewing_uid in following:
+                if st.button(tr("unfollow")):
+                    following.remove(viewing_uid)
+                    db.collection("users").document(uid).update({"following": following})
+                    st.rerun()
+            else:
+                if st.button(tr("follow")):
+                    following.append(viewing_uid)
+                    db.collection("users").document(uid).update({"following": following})
+                    st.rerun()
+        
+        # Stats summary
+        stats = user_data.get("stats", {})
+        if stats:
+            st.subheader(tr("stats"))
+            cols = st.columns(4)
+            with cols[0]:
+                st.metric(tr("speed"), stats.get("speed", 0))
+            with cols[1]:
+                st.metric(tr("control"), stats.get("control", 0))
+            with cols[2]:
+                st.metric(tr("dribbling"), stats.get("dribbling", 0))
+            with cols[3]:
+                st.metric(tr("shooting"), stats.get("shooting", 0))
+    
+    # Tabs
+    tab1, tab2, tab3 = st.tabs([tr("about"), tr("stats"), tr("posts")])
+    
+    with tab1:
+        st.subheader(tr("about"))
+        if viewing_uid == uid:  # Edit mode for own profile
+            new_bio = st.text_area(tr("bio"), value=bio, height=100)
+            if st.button(tr("save_profile"), key="save_profile_bio"):
+                db.collection("users").document(uid).update({"bio": new_bio})
+                update_user_data_cache(uid)  # Update cache
+                st.success(tr("profile_updated"))
+                st.rerun()
+        else:
+            st.write(bio if bio else "No bio available.")
+    
+    with tab2:
+        st.subheader(tr("stats"))
+        if viewing_uid == uid:  # Edit mode for own profile
+            stats = user_data.get("stats", {})
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                speed = st.slider(tr("speed"), 0, 100, stats.get("speed", 50))
+                control = st.slider(tr("control"), 0, 100, stats.get("control", 50))
+                dribbling = st.slider(tr("dribbling"), 0, 100, stats.get("dribbling", 50))
+                shooting = st.slider(tr("shooting"), 0, 100, stats.get("shooting", 50))
+            
+            with col2:
+                passing = st.slider(tr("passing"), 0, 100, stats.get("passing", 50))
+                defending = st.slider(tr("defending"), 0, 100, stats.get("defending", 50))
+                physical = st.slider(tr("physical"), 0, 100, stats.get("physical", 50))
+                weak_foot = st.slider(tr("weak_foot"), 0, 100, stats.get("weak_foot", 50))
+            
+            strong_foot = st.selectbox(tr("strong_foot"), [tr("right"), tr("left")], 
+                                     index=0 if stats.get("strong_foot", "right") == "right" else 1)
+            
+            if st.button(tr("save_profile"), key="save_profile_stats"):
+                new_stats = {
+                    "speed": speed, "control": control, "dribbling": dribbling,
+                    "shooting": shooting, "passing": passing, "defending": defending,
+                    "physical": physical, "weak_foot": weak_foot, "strong_foot": strong_foot
+                }
+                # Calculate overall rating (only numeric stats)
+                numeric_stats = [v for k, v in new_stats.items() if isinstance(v, (int, float))]
+                overall = sum(numeric_stats) // len(numeric_stats)
+                new_stats["overall"] = overall
+                
+                db.collection("users").document(uid).update({"stats": new_stats})
+                update_user_data_cache(uid)  # Update cache
+                st.success(tr("profile_updated"))
+                st.rerun()
+        else:
+            # Display stats
+            stats = user_data.get("stats", {})
+            if stats:
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric(tr("speed"), stats.get("speed", 0))
+                    st.metric(tr("control"), stats.get("control", 0))
+                    st.metric(tr("dribbling"), stats.get("dribbling", 0))
+                    st.metric(tr("shooting"), stats.get("shooting", 0))
+                with col2:
+                    st.metric(tr("passing"), stats.get("passing", 0))
+                    st.metric(tr("defending"), stats.get("defending", 0))
+                    st.metric(tr("physical"), stats.get("physical", 0))
+                    st.metric(tr("weak_foot"), stats.get("weak_foot", 0))
+                
+                st.metric(tr("overall_rating"), stats.get("overall", 0))
+                st.write(f"{tr('strong_foot')}: {stats.get('strong_foot', 'Right')}")
+            else:
+                st.info("No stats available.")
+    
+    with tab3:
+        st.subheader(tr("posts"))
+        # Get user's posts
+        posts = db.collection("posts").where("author_id", "==", viewing_uid).order_by("timestamp", direction="DESCENDING").stream()
+        posts_list = list(posts)
+        
+        if posts_list:
+            for post in posts_list:
+                post_data = post.to_dict() or {}
+                st.markdown(f"""
+                <div class='card'>
+                    <div style='margin-bottom:1rem;'>{post_data.get('content', '')}</div>
+                    <small style='color:#ccc;'>{post_data.get('timestamp', '')[:19]}</small>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                if post_data.get("image_base64"):
+                    st.image(base64.b64decode(post_data["image_base64"]), width=300)
+                
+                st.markdown(f"❤️ {len(post_data.get('likes', []))} 💬 {len(post_data.get('comments', []))}")
+                st.markdown("---")
+        else:
+            st.info(tr("no_posts"))
 
 # ────────────────────────────────────────────────────────────────────────────────
 # MAIN LANDING PAGE
 # ────────────────────────────────────────────────────────────────────────────────
 
 def page_main():
+    if SS["user"]:
+        # Search players and teams
+        st.header(f"🔍 {tr('search_players')}")
+        search_query = st.text_input(tr("search"), placeholder="Search by player or team name...")
+        
+        if search_query:
+            # Search in users collection
+            users = db.collection("users").stream()
+            matching_users = []
+            for user in users:
+                user_data = user.to_dict() or {}
+                username = user_data.get("username", "").lower()
+                if search_query.lower() in username:
+                    matching_users.append((user.id, user_data))
+            # Search in teams collection
+            teams = db.collection("teams").stream()
+            matching_teams = []
+            for team in teams:
+                team_data = team.to_dict() or {}
+                team_name = team_data.get("name", "").lower()
+                if search_query.lower() in team_name:
+                    matching_teams.append((team.id, team_data))
+            if matching_users:
+                st.subheader(f"Found {len(matching_users)} players:")
+                for user_id, user_data in matching_users:
+                    username = user_data.get("username", "Unknown")
+                    profile_pic = user_data.get("profile_picture")
+                    bio = user_data.get("bio", "")
+                    col1, col2, col3 = st.columns([1, 3, 1])
+                    with col1:
+                        if profile_pic:
+                            st.image(base64.b64decode(profile_pic), width=80)
+                        else:
+                            st.markdown("""
+                            <div style='width:80px;height:80px;border:2px dashed var(--main-yellow);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:2rem;'>
+                                ⚽
+                            </div>
+                            """, unsafe_allow_html=True)
+                    with col2:
+                        st.markdown(f"**{username}**")
+                        if bio:
+                            st.markdown(f"*{bio[:100]}{'...' if len(bio) > 100 else ''}*")
+                    with col3:
+                        if st.button(tr("view_profile"), key=f"view_{user_id}"):
+                            SS["viewing_profile"] = user_id
+                            reroute("profile")
+                    st.markdown("---")
+            if matching_teams:
+                st.subheader(f"Found {len(matching_teams)} teams:")
+                for team_id, team_data in matching_teams:
+                    team_name = team_data.get("name", "Unknown Team")
+                    logo = team_data.get("logo_base64")
+                    col1, col2 = st.columns([1, 5])
+                    with col1:
+                        if logo:
+                            st.image(base64.b64decode(logo), width=80)
+                        else:
+                            st.markdown("""
+                            <div style='width:80px;height:80px;border:2px dashed var(--main-yellow);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:2rem;'>
+                                🏟️
+                            </div>
+                            """, unsafe_allow_html=True)
+                    with col2:
+                        st.markdown(f"**{team_name}**")
+                        st.markdown(f"<span style='color:#aaa;'>Team ID: {team_id}</span>", unsafe_allow_html=True)
+                    st.markdown("---")
+            if not matching_users and not matching_teams:
+                st.info("No players or teams found matching your search.")
+    
     st.header(f"📖 {tr('latest_articles')}")
     # Articles horizontal scroll
     articles = list(db.collection("articles").stream())
@@ -554,19 +1207,47 @@ def page_dashboard():
             reroute("login")
         return
     uid = SS["user"]["localId"]
-    user_doc = db.collection("users").document(uid).get()
-    udata = user_doc.to_dict() or {}
+    udata = get_user_data(uid)
     st.header(tr("welcome", username=udata.get('username',tr('player_name'))))
     tab1, tab2, tab3 = st.tabs([f"👤 {tr('profile')}", f"⚽ {tr('my_teams')}", f"🖼️ {tr('edit_teams_tab')}"])
 
     # ── Profile ──────────────────
     with tab1:
         profile = udata.get("profile", {})
+        
+        # Profile picture upload
+        st.subheader(tr("profile_picture"))
+        profile_pic = st.file_uploader(tr("upload_profile_pic"), ["jpg", "jpeg", "png"], key="profile_pic")
+        if profile_pic:
+            pic64 = base64.b64encode(profile_pic.read()).decode()
+            st.image(base64.b64decode(pic64), width=200)
+            if st.button(tr("save_profile"), key="save_profile_pic"):
+                db.collection("users").document(uid).update({"profile_picture": pic64})
+                update_user_data_cache(uid)  # Update cache
+                st.success(tr("profile_updated"))
+                # Don't rerun here to keep the form state
+        
+        # Basic info
+        st.subheader("Basic Information")
         h = st.number_input(tr("height"), 100, 250, value=int(profile.get("height", 170)))
         w = st.number_input(tr("weight"), 30, 200, value=int(profile.get("weight", 70)))
-        if st.button(tr("save_profile")):
-            db.collection("users").document(uid).update({"profile": {"height": h, "weight": w}})
+        bio = st.text_area(tr("bio"), value=udata.get("bio", ""), height=100)
+        
+        if st.button(tr("save_profile"), key="save_profile_basic"):
+            db.collection("users").document(uid).update({
+                "profile": {"height": h, "weight": w},
+                "bio": bio
+            })
+            update_user_data_cache(uid)  # Update cache
             st.success(tr("profile_updated"))
+            # Don't rerun here to keep the form state
+        
+        # Quick profile view
+        st.markdown("---")
+        st.subheader("Quick Profile Preview")
+        if st.button(tr("view_profile"), key="view_profile_dashboard"):
+            SS["viewing_profile"] = uid
+            reroute("profile")
 
     # ── My Teams (Create & Add Players) ──────────────────
     with tab2:
@@ -926,9 +1607,18 @@ def page_admin():
 header()
 sidebar()
 
+# Check session validity
+if SS.get("user") and not check_session():
+    SS["user"] = None
+    SS["user_data_cache"] = {}
+
 page = SS["page"]
 if page == "login":
     page_login()
+elif page == "feed":
+    page_feed()
+elif page == "profile":
+    page_profile()
 elif page == "dashboard":
     page_dashboard()
 elif page == "messages":
